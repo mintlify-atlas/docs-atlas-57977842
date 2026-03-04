@@ -1,0 +1,203 @@
+---
+title: Introduction
+description: Offline reverse geocoding for Indonesia - convert coordinates to administrative addresses down to village level
+---
+
+<div className="relative overflow-hidden bg-gradient-to-br from-[#1B5E20] via-[#2E7D32] to-[#66BB6A] dark:from-[#0a2e10] dark:via-[#1B5E20] dark:to-[#2E7D32] py-20 px-4 sm:px-6 lg:px-8 rounded-2xl mb-12">
+  <div className="max-w-5xl mx-auto">
+    <div className="text-center">
+      <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-white mb-6">
+        Geocoder ID
+      </h1>
+      <p className="text-lg sm:text-xl text-white/90 max-w-2xl mx-auto mb-8">
+        Fast, offline reverse geocoding for Indonesia. Convert latitude/longitude coordinates to administrative addresses down to the village level—no internet required.
+      </p>
+      <div className="flex flex-wrap gap-4 justify-center">
+        <a 
+          href="/quickstart" 
+          className="inline-flex items-center px-6 py-3 bg-white text-[#2E7D32] font-semibold rounded-lg hover:bg-white/90 transition-colors no-underline"
+        >
+          Get Started
+        </a>
+        <a 
+          href="/api/geocoder" 
+          className="inline-flex items-center px-6 py-3 border border-white/30 bg-white/10 text-white font-semibold rounded-lg hover:bg-white/20 transition-colors no-underline"
+        >
+          API Reference
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div className="mt-16 mb-16 max-w-5xl mx-auto px-6">
+  <h2 className="text-2xl sm:text-3xl font-semibold text-gray-900 dark:text-white mb-3">
+    Key features
+  </h2>
+  <p className="text-base text-gray-600 dark:text-gray-400 mb-8">
+    Everything you need for fast, accurate geocoding in Indonesia
+  </p>
+  
+  <CardGroup cols={2}>
+    <Card title="Offline first" icon="wifi-slash">
+      Works completely offline after initial database download. No internet connection required for queries.
+    </Card>
+    <Card title="Lightning fast" icon="bolt">
+      Spatial indexing provides O(log n) query performance for instant results.
+    </Card>
+    <Card title="Auto-download" icon="download">
+      Database automatically downloads on first use. Zero configuration needed.
+    </Card>
+    <Card title="Dual-use design" icon="code">
+      Use as a Go library in your applications or as a standalone CLI tool.
+    </Card>
+    <Card title="Full hierarchy" icon="layer-group">
+      Query at any administrative level: province, regency, district, or village.
+    </Card>
+    <Card title="Accurate data" icon="map-location-dot">
+      Uses official Indonesian administrative boundary data with precise coordinates.
+    </Card>
+  </CardGroup>
+</div>
+
+<div className="mt-16 mb-16 max-w-5xl mx-auto px-6">
+  <h2 className="text-2xl sm:text-3xl font-semibold text-gray-900 dark:text-white mb-3">
+    Quick start
+  </h2>
+  <p className="text-base text-gray-600 dark:text-gray-400 mb-8">
+    Get up and running in minutes
+  </p>
+
+  <Steps>
+    <Step title="Install Geocoder ID">
+      Install as a Go library or download the CLI binary.
+
+      <CodeGroup>
+      ```bash Go Library
+      go get github.com/zsbahtiar/geocoder-id
+      ```
+
+      ```bash macOS (Apple Silicon)
+      curl -L https://github.com/zsbahtiar/geocoder-id/releases/latest/download/geocoder-darwin-arm64 -o geocoder
+      chmod +x geocoder
+      ```
+
+      ```bash Linux
+      curl -L https://github.com/zsbahtiar/geocoder-id/releases/latest/download/geocoder-linux-amd64 -o geocoder
+      chmod +x geocoder
+      ```
+      </CodeGroup>
+    </Step>
+
+    <Step title="Run your first query">
+      Query coordinates to get administrative location data. The database will auto-download on first use.
+
+      <Tabs>
+        <Tab title="Go">
+          ```go
+          package main
+
+          import (
+              "fmt"
+              "log"
+              
+              geocoder "github.com/zsbahtiar/geocoder-id"
+          )
+
+          func main() {
+              gc, err := geocoder.NewDefault()
+              if err != nil {
+                  log.Fatal(err)
+              }
+              defer gc.Close()
+
+              result := gc.ReverseGeocode(-6.2088, 106.8456)
+              
+              fmt.Printf("Province: %s\n", result.Province.Name)
+              fmt.Printf("Village: %s\n", result.Village.Name)
+          }
+          ```
+        </Tab>
+        <Tab title="CLI">
+          ```bash
+          geocoder geocode --coords="-6.2088 106.8456"
+          ```
+        </Tab>
+      </Tabs>
+
+      <Accordion title="Example output">
+        ```
+        | province_code | province_name | regency_code | regency_name                      | district_code | district_name | village_code  | village_name  |
+        |---------------|---------------|--------------|-----------------------------------|---------------|---------------|---------------|---------------|
+        | 31            | DKI Jakarta   | 31.74        | Kota Administrasi Jakarta Selatan | 31.74.02      | Setiabudi     | 31.74.02.1006 | Pasar Manggis |
+        ```
+      </Accordion>
+    </Step>
+
+    <Step title="Explore more features">
+      Query multiple coordinates, specify administrative levels, or output as JSON.
+
+      ```bash
+      # Multiple coordinates (semicolon separated)
+      geocoder geocode --coords="-6.2088 106.8456;-7.2575 112.7521"
+
+      # Specific administrative level
+      geocoder geocode --coords="-6.2088 106.8456" --level=district
+
+      # JSON output format
+      geocoder geocode --coords="-6.2088 106.8456" --output=json
+      ```
+
+      <Info>
+        See the [CLI usage guide](/guides/cli-usage) for all available options.
+      </Info>
+    </Step>
+  </Steps>
+</div>
+
+<div className="mt-16 mb-16 max-w-5xl mx-auto px-6">
+  <h2 className="text-2xl sm:text-3xl font-semibold text-gray-900 dark:text-white mb-3">
+    Explore the documentation
+  </h2>
+  <p className="text-base text-gray-600 dark:text-gray-400 mb-8">
+    Learn how to integrate Geocoder ID into your projects
+  </p>
+
+  <CardGroup cols={3}>
+    <Card title="Go library guide" icon="book-open" href="/guides/go-library">
+      Learn how to use Geocoder ID in your Go applications
+    </Card>
+    <Card title="CLI usage" icon="terminal" href="/guides/cli-usage">
+      Master the command-line interface and all its options
+    </Card>
+    <Card title="Database management" icon="database" href="/guides/database-management">
+      Understand database storage and configuration options
+    </Card>
+    <Card title="Administrative levels" icon="map" href="/guides/administrative-levels">
+      Learn about Indonesia's administrative hierarchy
+    </Card>
+    <Card title="API reference" icon="code" href="/api/geocoder">
+      Complete API documentation for all functions and types
+    </Card>
+    <Card title="Examples" icon="flask" href="/examples/basic-usage">
+      Real-world usage examples and patterns
+    </Card>
+  </CardGroup>
+</div>
+
+<div className="mt-20 mb-16 max-w-5xl mx-auto px-6">
+  <div className="bg-gradient-to-r from-[#2E7D32] to-[#66BB6A] dark:from-[#1B5E20] dark:to-[#2E7D32] rounded-2xl p-8 sm:p-12 text-center">
+    <h2 className="text-2xl sm:text-3xl font-bold text-white mb-4">
+      Ready to start geocoding?
+    </h2>
+    <p className="text-lg text-white/90 mb-6 max-w-2xl mx-auto">
+      Install Geocoder ID and convert your first coordinates to Indonesian addresses in minutes.
+    </p>
+    <a 
+      href="/quickstart" 
+      className="inline-flex items-center px-6 py-3 bg-white text-[#2E7D32] font-semibold rounded-lg hover:bg-white/90 transition-colors no-underline"
+    >
+      Get Started Now
+    </a>
+  </div>
+</div>

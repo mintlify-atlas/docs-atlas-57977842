@@ -1,0 +1,188 @@
+---
+title: Batch processing
+description: Process multiple coordinates efficiently with Geocoder ID
+---
+
+When you need to geocode multiple locations, batch processing provides an efficient approach. This example shows how to process several Indonesian cities in a single run.
+
+## Complete example
+
+```go
+package main
+
+import (
+	"encoding/json"
+	"fmt"
+	"log"
+	"os"
+
+	geocoder "github.com/zsbahtiar/geocoder-id"
+)
+
+func main() {
+	gc, err := geocoder.NewDefault()
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer gc.Close()
+
+	coordinates := []geocoder.Coord{
+		{Lat: -6.2088, Lon: 106.8456}, // Jakarta
+		{Lat: -6.9175, Lon: 107.6191}, // Bandung
+		{Lat: -7.2575, Lon: 112.7521}, // Surabaya
+		{Lat: -8.6705, Lon: 115.2126}, // Bali
+		{Lat: -2.0498, Lon: 110.1879}, // Kalimantan Barat
+	}
+
+	var results []geocoder.Result
+	for _, coord := range coordinates {
+		result := gc.ReverseGeocode(coord.Lat, coord.Lon)
+		results = append(results, result)
+	}
+
+	enc := json.NewEncoder(os.Stdout)
+	enc.SetIndent("", "  ")
+	enc.Encode(results)
+
+	fmt.Fprintf(os.Stderr, "\nProcessed %d coordinates\n", len(coordinates))
+}
+```
+
+## Processing pattern
+
+<Accordion title="Define your coordinate set">
+  ```go
+  coordinates := []geocoder.Coord{
+      {Lat: -6.2088, Lon: 106.8456}, // Jakarta
+      {Lat: -6.9175, Lon: 107.6191}, // Bandung
+      {Lat: -7.2575, Lon: 112.7521}, // Surabaya
+      {Lat: -8.6705, Lon: 115.2126}, // Bali
+      {Lat: -2.0498, Lon: 110.1879}, // Kalimantan Barat
+  }
+  ```
+
+  Create a slice containing all coordinates you want to process. The `Coord` type is a convenience struct with `Lat` and `Lon` fields.
+</Accordion>
+
+<Accordion title="Process in a loop">
+  ```go
+  var results []geocoder.Result
+  for _, coord := range coordinates {
+      result := gc.ReverseGeocode(coord.Lat, coord.Lon)
+      results = append(results, result)
+  }
+  ```
+
+  Iterate through coordinates and collect results. Each query is independent and uses the same geocoder instance.
+</Accordion>
+
+<Accordion title="Export results as JSON">
+  ```go
+  enc := json.NewEncoder(os.Stdout)
+  enc.SetIndent("", "  ")
+  enc.Encode(results)
+  ```
+
+  The `Result` struct is JSON-serializable, making it easy to export data for further processing or storage.
+</Accordion>
+
+## Example output
+
+The program outputs structured JSON with all five locations:
+
+```json
+[
+  {
+    "province": {
+      "name": "DKI JAKARTA",
+      "code": "31"
+    },
+    "regency": {
+      "name": "KOTA JAKARTA PUSAT",
+      "code": "3171"
+    },
+    "district": {
+      "name": "MENTENG",
+      "code": "317104"
+    },
+    "village": {
+      "name": "MENTENG",
+      "code": "3171041006"
+    }
+  },
+  {
+    "province": {
+      "name": "JAWA BARAT",
+      "code": "32"
+    },
+    "regency": {
+      "name": "KOTA BANDUNG",
+      "code": "3273"
+    }
+    // ... district and village data
+  }
+  // ... remaining 3 locations
+]
+```
+
+<Info>
+  And the summary line on stderr:
+  ```
+  Processed 5 coordinates
+  ```
+</Info>
+
+## Efficiency tips
+
+<Tabs>
+  <Tab title="Reuse the geocoder">
+    Create the geocoder once and reuse it for all queries. Initialization is the expensive part; individual queries are fast.
+
+    ```go
+    gc, err := geocoder.NewDefault() // Do this once
+    defer gc.Close()
+
+    // Then query many times
+    for _, coord := range manyCoordinates {
+        result := gc.ReverseGeocode(coord.Lat, coord.Lon)
+    }
+    ```
+  </Tab>
+
+  <Tab title="Consider concurrency">
+    For very large batches, you can process coordinates concurrently since queries are read-only:
+
+    ```go
+    // Geocoder is safe for concurrent reads
+    var wg sync.WaitGroup
+    resultsChan := make(chan geocoder.Result, len(coordinates))
+
+    for _, coord := range coordinates {
+        wg.Add(1)
+        go func(c geocoder.Coord) {
+            defer wg.Done()
+            resultsChan <- gc.ReverseGeocode(c.Lat, c.Lon)
+        }(coord)
+    }
+
+    wg.Wait()
+    close(resultsChan)
+    ```
+  </Tab>
+
+  <Tab title="Stream processing">
+    For massive datasets, process and output results incrementally instead of storing everything in memory:
+
+    ```go
+    enc := json.NewEncoder(os.Stdout)
+    for _, coord := range coordinates {
+        result := gc.ReverseGeocode(coord.Lat, coord.Lon)
+        enc.Encode(result) // Write immediately
+    }
+    ```
+  </Tab>
+</Tabs>
+
+<Note>
+  The geocoder instance is safe for concurrent use from multiple goroutines, making it ideal for parallel batch processing.
+</Note>

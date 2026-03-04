@@ -1,0 +1,130 @@
+---
+title: Installation
+description: Install Geocoder ID as a CLI tool or Go library
+---
+
+Geocode ID is available as both a command-line tool and a Go library. Choose the installation method that best fits your use case.
+
+## CLI installation
+
+The CLI tool is distributed as pre-built binaries for macOS and Linux.
+
+<Steps>
+  <Step title="Download the binary">
+    Download the appropriate binary for your platform:
+
+    <CodeGroup>
+      ```bash macOS (Apple Silicon)
+      curl -L https://github.com/zsbahtiar/geocoder-id/releases/latest/download/geocoder-darwin-arm64 -o geocoder
+      ```
+
+      ```bash macOS (Intel)
+      curl -L https://github.com/zsbahtiar/geocoder-id/releases/latest/download/geocoder-darwin-amd64 -o geocoder
+      ```
+
+      ```bash Linux
+      curl -L https://github.com/zsbahtiar/geocoder-id/releases/latest/download/geocoder-linux-amd64 -o geocoder
+      ```
+    </CodeGroup>
+  </Step>
+
+  <Step title="Make the binary executable">
+    ```bash
+    chmod +x geocoder
+    ```
+  </Step>
+
+  <Step title="Verify the installation">
+    Run the geocoder command to verify it's installed correctly:
+
+    ```bash
+    ./geocoder geocode --coords="-6.2088 106.8456"
+    ```
+
+    <Info>
+      On first run, Geocoder ID will automatically download the required database file (~50MB). This only happens once.
+    </Info>
+  </Step>
+
+  <Step title="(Optional) Move to PATH">
+    For easier access, move the binary to a directory in your PATH:
+
+    ```bash
+    sudo mv geocoder /usr/local/bin/
+    ```
+
+    Now you can run `geocoder` from anywhere without the `./` prefix.
+  </Step>
+</Steps>
+
+## Go library installation
+
+If you're building a Go application, you can use Geocoder ID as a library.
+
+<Steps>
+  <Step title="Add the dependency">
+    Use `go get` to add Geocoder ID to your project:
+
+    ```bash
+    go get github.com/zsbahtiar/geocoder-id
+    ```
+  </Step>
+
+  <Step title="Import in your code">
+    ```go
+    import geocoder "github.com/zsbahtiar/geocoder-id"
+    ```
+  </Step>
+
+  <Step title="Initialize the geocoder">
+    ```go
+    gc, err := geocoder.NewDefault()
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer gc.Close()
+    ```
+
+    <Info>
+      The `NewDefault()` function automatically downloads the database on first use and searches for it in common locations on subsequent runs.
+    </Info>
+  </Step>
+</Steps>
+
+## Database auto-download
+
+Geocode ID requires a spatial database to perform reverse geocoding. The database is automatically downloaded when you first use the library or CLI tool.
+
+<Accordion title="Database search locations">
+  Geocoder ID searches for the database in the following locations (in order):
+
+  1. Path specified in `GEOCODER_DB_PATH` environment variable
+  2. Current directory (`geocoder.duckdb`)
+  3. `data/` subdirectory
+  4. Same directory as the executable
+  5. `data/` subdirectory relative to executable
+  6. `~/.geocoder-id/` directory
+
+  If the database is not found in any of these locations, it will be downloaded automatically to `~/.geocoder-id/geocoder.duckdb`.
+</Accordion>
+
+<Note>
+  The database is approximately 50MB and only needs to be downloaded once.
+</Note>
+
+## Build from source
+
+If you prefer to build from source:
+
+```bash
+git clone https://github.com/zsbahtiar/geocoder-id
+cd geocoder-id
+make build
+./geocoder geocode --coords="-6.2088 106.8456"
+```
+
+## Next steps
+
+<Card title="Quickstart" icon="rocket" href="/quickstart">
+  Get started with your first geocoding query
+</Card>

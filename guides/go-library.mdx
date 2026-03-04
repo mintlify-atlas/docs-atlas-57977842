@@ -1,0 +1,337 @@
+---
+title: Go library usage
+description: Learn how to use the Geocoder ID Go library in your applications
+---
+
+The Geocoder ID library provides a simple, offline reverse geocoding API for Indonesian administrative boundaries. This guide covers initialization, basic usage, and error handling patterns.
+
+## Installation
+
+Install the library using Go modules:
+
+```bash
+go get github.com/zsbahtiar/geocoder-id
+```
+
+## Initializing the geocoder
+
+You can initialize the geocoder in two ways: automatically detect the database or specify a custom path.
+
+<CodeGroup>
+
+```go Auto-detect database
+package main
+
+import (
+    "log"
+    geocoder "github.com/zsbahtiar/geocoder-id"
+)
+
+func main() {
+    gc, err := geocoder.NewDefault()
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer gc.Close()
+    
+    // Use geocoder...
+}
+```
+
+```go Custom database path
+package main
+
+import (
+    "log"
+    geocoder "github.com/zsbahtiar/geocoder-id"
+)
+
+func main() {
+    gc, err := geocoder.New("/path/to/geocoder.duckdb")
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer gc.Close()
+    
+    // Use geocoder...
+}
+```
+
+</CodeGroup>
+
+<Info>
+`NewDefault()` automatically searches for the database in standard locations and downloads it if not found. See the [database management guide](/guides/database-management) for details.
+</Info>
+
+## Constructor functions
+
+<ParamField path="NewDefault()" type="(*Geocoder, error)">
+  Creates a geocoder instance by automatically detecting the database location. If the database is not found, it will be downloaded automatically to `~/.geocoder-id/geocoder.duckdb`.
+</ParamField>
+
+<ParamField path="New(dbPath string)" type="(*Geocoder, error)">
+  Creates a geocoder instance with a specific database path. Use this when you want full control over the database location.
+  
+  **Parameters:**
+  - `dbPath` - Absolute or relative path to the `geocoder.duckdb` file
+</ParamField>
+
+## Basic reverse geocoding
+
+Use `ReverseGeocode()` to convert coordinates to administrative addresses:
+
+```go
+package main
+
+import (
+    "fmt"
+    "log"
+    geocoder "github.com/zsbahtiar/geocoder-id"
+)
+
+func main() {
+    gc, err := geocoder.NewDefault()
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer gc.Close()
+
+    result := gc.ReverseGeocode(-6.2088, 106.8456)
+
+    if result.Province != nil {
+        fmt.Printf("Province: %s (%s)\n", result.Province.Name, result.Province.Code)
+    }
+    if result.Regency != nil {
+        fmt.Printf("Regency:  %s (%s)\n", result.Regency.Name, result.Regency.Code)
+    }
+    if result.District != nil {
+        fmt.Printf("District: %s (%s)\n", result.District.Name, result.District.Code)
+    }
+    if result.Village != nil {
+        fmt.Printf("Village:  %s (%s)\n", result.Village.Name, result.Village.Code)
+    }
+}
+```
+
+<Tip>
+Always check if result fields are `nil` before accessing them. Coordinates outside Indonesia will return a result with all `nil` fields.
+</Tip>
+
+## Querying specific administrative levels
+
+Use `ReverseGeocodeLevel()` to query at specific administrative levels:
+
+```go
+package main
+
+import (
+    "fmt"
+    "log"
+    geocoder "github.com/zsbahtiar/geocoder-id"
+)
+
+func main() {
+    gc, err := geocoder.NewDefault()
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer gc.Close()
+
+    lat, lon := -6.2088, 106.8456
+
+    // Query at province level only
+    result := gc.ReverseGeocodeLevel(lat, lon, geocoder.LevelProvince)
+    
+    if result.Province != nil {
+        fmt.Printf("Province: %s\n", result.Province.Name)
+    }
+}
+```
+
+See the [administrative levels guide](/guides/administrative-levels) to understand how different levels affect query results.
+
+## Processing batch coordinates
+
+Process multiple coordinates efficiently by reusing the geocoder instance:
+
+```go
+package main
+
+import (
+    "encoding/json"
+    "fmt"
+    "log"
+    "os"
+    geocoder "github.com/zsbahtiar/geocoder-id"
+)
+
+func main() {
+    gc, err := geocoder.NewDefault()
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer gc.Close()
+
+    coordinates := []geocoder.Coord{
+        {Lat: -6.2088, Lon: 106.8456}, // Jakarta
+        {Lat: -6.9175, Lon: 107.6191}, // Bandung
+        {Lat: -7.2575, Lon: 112.7521}, // Surabaya
+        {Lat: -8.6705, Lon: 115.2126}, // Bali
+        {Lat: -2.0498, Lon: 110.1879}, // Kalimantan Barat
+    }
+
+    var results []geocoder.Result
+    for _, coord := range coordinates {
+        result := gc.ReverseGeocode(coord.Lat, coord.Lon)
+        results = append(results, result)
+    }
+
+    enc := json.NewEncoder(os.Stdout)
+    enc.SetIndent("", "  ")
+    enc.Encode(results)
+
+    fmt.Fprintf(os.Stderr, "\nProcessed %d coordinates\n", len(coordinates))
+}
+```
+
+## Parsing coordinate strings
+
+The library provides a `ParseCoords()` helper function to parse coordinate strings:
+
+```go
+package main
+
+import (
+    "fmt"
+    geocoder "github.com/zsbahtiar/geocoder-id"
+)
+
+func main() {
+    // Single coordinate
+    coords := geocoder.ParseCoords("-6.2088 106.8456")
+    fmt.Printf("Parsed %d coordinate(s)\n", len(coords))
+    
+    // Multiple coordinates separated by semicolon
+    coords = geocoder.ParseCoords("-6.2088 106.8456;-6.9175 107.6191")
+    fmt.Printf("Parsed %d coordinate(s)\n", len(coords))
+    
+    for _, c := range coords {
+        fmt.Printf("Lat: %f, Lon: %f\n", c.Lat, c.Lon)
+    }
+}
+```
+
+<Note>
+`ParseCoords()` expects coordinates in the format `"lat lon"` separated by spaces, with multiple coordinates separated by semicolons. Invalid coordinates are silently skipped.
+</Note>
+
+## Error handling
+
+Handle errors appropriately when initializing and using the geocoder:
+
+<Steps>
+
+<Step title="Check initialization errors">
+  Database errors occur if the file is missing, corrupted, or inaccessible:
+  
+  ```go
+  gc, err := geocoder.NewDefault()
+  if err != nil {
+      log.Fatalf("Failed to initialize geocoder: %v", err)
+  }
+  defer gc.Close()
+  ```
+</Step>
+
+<Step title="Close the geocoder when done">
+  Always close the geocoder to release database resources:
+  
+  ```go
+  defer gc.Close()
+  ```
+</Step>
+
+<Step title="Handle empty results">
+  Check if result fields are `nil` for coordinates outside Indonesia:
+  
+  ```go
+  result := gc.ReverseGeocode(lat, lon)
+  if result.Province == nil {
+      fmt.Println("Coordinate is outside Indonesia")
+      return
+  }
+  ```
+</Step>
+
+</Steps>
+
+<Warning>
+The geocoder opens the database in read-only mode. Attempting to write to the database will result in an error.
+</Warning>
+
+## API reference
+
+### Methods
+
+<Accordion title="ReverseGeocode(lat, lon float64) Result">
+  Performs reverse geocoding at the village level (most detailed).
+  
+  **Parameters:**
+  - `lat` - Latitude coordinate
+  - `lon` - Longitude coordinate
+  
+  **Returns:**
+  - `Result` - Contains Province, Regency, District, and Village information. Fields are `nil` if not found.
+</Accordion>
+
+<Accordion title="ReverseGeocodeLevel(lat, lon float64, level Level) Result">
+  Performs reverse geocoding at a specific administrative level.
+  
+  **Parameters:**
+  - `lat` - Latitude coordinate
+  - `lon` - Longitude coordinate
+  - `level` - Administrative level: `LevelProvince`, `LevelRegency`, `LevelDistrict`, or `LevelVillage`
+  
+  **Returns:**
+  - `Result` - Contains administrative hierarchy up to the specified level.
+</Accordion>
+
+<Accordion title="Close() error">
+  Closes the database connection and releases resources.
+  
+  **Returns:**
+  - `error` - Error if the database fails to close properly
+</Accordion>
+
+### Helper functions
+
+<Accordion title="ParseCoords(s string) []Coord">
+  Parses a string containing one or more coordinates.
+  
+  **Parameters:**
+  - `s` - Coordinate string in format `"lat lon"` or `"lat lon;lat lon;..."`
+  
+  **Returns:**
+  - `[]Coord` - Slice of parsed coordinates. Invalid coordinates are skipped.
+  
+  **Example formats:**
+  - Single: `"-6.2088 106.8456"`
+  - Multiple: `"-6.2088 106.8456;-6.9175 107.6191"`
+</Accordion>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="CLI usage" icon="terminal" href="/guides/cli-usage">
+    Learn how to use the command-line interface
+  </Card>
+  <Card title="Administrative levels" icon="map" href="/guides/administrative-levels">
+    Understand Indonesia's administrative hierarchy
+  </Card>
+  <Card title="Database management" icon="database" href="/guides/database-management">
+    Configure database paths and auto-download
+  </Card>
+  <Card title="API reference" icon="code" href="/api/geocoder">
+    Explore the complete API documentation
+  </Card>
+</CardGroup>

@@ -1,0 +1,346 @@
+---
+title: Database management
+description: Learn how Geocoder ID manages the DuckDB database, including auto-download and custom paths
+---
+
+Geocoder ID uses a DuckDB database file containing Indonesia's administrative boundaries. This guide explains how the database is discovered, downloaded, and configured.
+
+## Database search paths
+
+When you use `NewDefault()` or run the CLI without the `--db` flag, Geocoder ID searches for the database in the following locations (in order):
+
+<Steps>
+
+<Step title="Environment variable">
+  First, the `GEOCODER_DB_PATH` environment variable is checked:
+  
+  ```bash
+  export GEOCODER_DB_PATH="/custom/path/geocoder.duckdb"
+  ```
+  
+  This takes precedence over all other locations.
+</Step>
+
+<Step title="Current directory">
+  Searches for `geocoder.duckdb` in the current working directory:
+  
+  ```
+  ./geocoder.duckdb
+  ```
+</Step>
+
+<Step title="Data subdirectory">
+  Searches in a `data/` subdirectory of the current working directory:
+  
+  ```
+  ./data/geocoder.duckdb
+  ```
+</Step>
+
+<Step title="Executable directory">
+  Searches in the same directory as the executable:
+  
+  ```
+  /path/to/executable/geocoder.duckdb
+  ```
+</Step>
+
+<Step title="Executable data subdirectory">
+  Searches in a `data/` subdirectory relative to the executable:
+  
+  ```
+  /path/to/executable/data/geocoder.duckdb
+  ```
+</Step>
+
+<Step title="User home directory">
+  Searches in `~/.geocoder-id/`:
+  
+  ```
+  ~/.geocoder-id/geocoder.duckdb
+  ```
+</Step>
+
+</Steps>
+
+<Info>
+If the database is not found in any of these locations, Geocoder ID automatically downloads it to `~/.geocoder-id/geocoder.duckdb`.
+</Info>
+
+## Auto-download behavior
+
+When the database is not found, `NewDefault()` automatically downloads it:
+
+<CodeGroup>
+
+```go Go library
+package main
+
+import (
+    "log"
+    geocoder "github.com/zsbahtiar/geocoder-id"
+)
+
+func main() {
+    // Database will be auto-downloaded if not found
+    gc, err := geocoder.NewDefault()
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer gc.Close()
+    
+    // Use geocoder...
+}
+```
+
+```bash CLI
+# Database will be auto-downloaded if not found
+geocoder geocode --coords="-6.2088 106.8456"
+```
+
+</CodeGroup>
+
+The database is downloaded to:
+```
+~/.geocoder-id/geocoder.duckdb
+```
+
+<Warning>
+The database file is approximately 100-200 MB. Ensure you have sufficient disk space and an active internet connection for the initial download.
+</Warning>
+
+## Using a custom database path
+
+You can bypass the auto-detection by specifying a custom database path.
+
+### Go library
+
+Use the `New()` constructor with a specific path:
+
+```go
+package main
+
+import (
+    "log"
+    geocoder "github.com/zsbahtiar/geocoder-id"
+)
+
+func main() {
+    gc, err := geocoder.New("/custom/path/geocoder.duckdb")
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer gc.Close()
+    
+    // Use geocoder...
+}
+```
+
+### CLI
+
+Use the `--db` flag:
+
+```bash
+geocoder geocode --coords="-6.2088 106.8456" --db="/custom/path/geocoder.duckdb"
+```
+
+<Tip>
+Custom paths are useful when you want to use a specific version of the database or store it in a shared location for multiple applications.
+</Tip>
+
+## Environment variable configuration
+
+Set the `GEOCODER_DB_PATH` environment variable to avoid specifying the path repeatedly:
+
+<CodeGroup>
+
+```bash Bash/Zsh
+export GEOCODER_DB_PATH="/custom/path/geocoder.duckdb"
+```
+
+```bash Fish
+set -x GEOCODER_DB_PATH "/custom/path/geocoder.duckdb"
+```
+
+```powershell PowerShell
+$env:GEOCODER_DB_PATH = "C:\custom\path\geocoder.duckdb"
+```
+
+</CodeGroup>
+
+Once set, both the Go library and CLI will use this path:
+
+```go
+// Uses GEOCODER_DB_PATH if set
+gc, err := geocoder.NewDefault()
+```
+
+```bash
+# Uses GEOCODER_DB_PATH if set
+geocoder geocode --coords="-6.2088 106.8456"
+```
+
+<Note>
+The environment variable takes precedence over all search paths but can be overridden by explicitly using `New(dbPath)` or the `--db` flag.
+</Note>
+
+## Database structure
+
+The DuckDB database contains two main tables:
+
+### locations table
+
+Stores geometry data for administrative boundaries:
+
+- `code` - Administrative code (e.g., "31.71.01.1001")
+- `level` - Administrative level ("province", "regency", "district", "village")
+- `geom` - Polygon geometry (PostGIS-compatible)
+
+### hierarchy table
+
+Stores the hierarchical relationship between administrative levels:
+
+- `code` - Administrative code
+- `province_code`, `province_name` - Province information
+- `regency_code`, `regency_name` - Regency/city information
+- `district_code`, `district_name` - District/subdistrict information
+- `village_code`, `village_name` - Village/kelurahan information
+
+<Info>
+The database is opened in read-only mode to prevent accidental modifications. Queries use the DuckDB spatial extension for efficient point-in-polygon operations.
+</Info>
+
+## Database updates
+
+Geocoder ID does not automatically update the database. To use a newer version:
+
+<Steps>
+
+<Step title="Remove old database">
+  Delete the existing database file:
+  
+  ```bash
+  rm ~/.geocoder-id/geocoder.duckdb
+  ```
+</Step>
+
+<Step title="Trigger re-download">
+  The next time you use `NewDefault()` or run the CLI, the latest database will be downloaded:
+  
+  ```bash
+  geocoder geocode --coords="-6.2088 106.8456"
+  ```
+</Step>
+
+</Steps>
+
+<Tip>
+Alternatively, manually download the latest database file from the project repository and place it in one of the search paths.
+</Tip>
+
+## Troubleshooting
+
+<Accordion title="Database not found error">
+  **Error:** `database not found`
+  
+  **Causes:**
+  - Database doesn't exist in any search path
+  - Auto-download failed (no internet connection)
+  - Insufficient permissions to create `~/.geocoder-id/`
+  
+  **Solutions:**
+  - Check your internet connection
+  - Manually download the database and place it in a search path
+  - Set `GEOCODER_DB_PATH` to a writable location
+  - Use `--db` flag with a valid path
+</Accordion>
+
+<Accordion title="Failed to open database">
+  **Error:** `failed to open database`
+  
+  **Causes:**
+  - Database file is corrupted
+  - Insufficient permissions
+  - Database is locked by another process
+  
+  **Solutions:**
+  - Delete and re-download the database
+  - Check file permissions
+  - Ensure no other process is using the database
+</Accordion>
+
+<Accordion title="Failed to load spatial extension">
+  **Error:** `failed to load spatial extension`
+  
+  **Causes:**
+  - DuckDB version incompatibility
+  - Corrupted database file
+  
+  **Solutions:**
+  - Update to the latest version of Geocoder ID
+  - Delete and re-download the database
+</Accordion>
+
+<Accordion title="Permission denied when auto-downloading">
+  **Error:** Permission denied when creating `~/.geocoder-id/`
+  
+  **Solutions:**
+  - Set `GEOCODER_DB_PATH` to a writable location
+  - Manually create `~/.geocoder-id/` with proper permissions
+  - Use a custom path with `New()` or `--db`
+</Accordion>
+
+## Best practices
+
+<Steps>
+
+<Step title="Use NewDefault() for most cases">
+  Let Geocoder ID handle database discovery and download automatically:
+  
+  ```go
+  gc, err := geocoder.NewDefault()
+  ```
+</Step>
+
+<Step title="Set environment variable for shared databases">
+  When multiple applications use the same database, set `GEOCODER_DB_PATH`:
+  
+  ```bash
+  export GEOCODER_DB_PATH="/shared/data/geocoder.duckdb"
+  ```
+</Step>
+
+<Step title="Use New() for custom configurations">
+  When you need full control over the database location:
+  
+  ```go
+  gc, err := geocoder.New("/app/data/geocoder.duckdb")
+  ```
+</Step>
+
+<Step title="Check disk space before deployment">
+  Ensure the target system has ~200 MB available for the database.
+</Step>
+
+<Step title="Version control database location">
+  Document the database path in your application's configuration or README.
+</Step>
+
+</Steps>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Go library usage" icon="code" href="/guides/go-library">
+    Learn how to use the Go library
+  </Card>
+  <Card title="CLI usage" icon="terminal" href="/guides/cli-usage">
+    Use the command-line interface
+  </Card>
+  <Card title="Administrative levels" icon="map" href="/guides/administrative-levels">
+    Understand Indonesia's administrative hierarchy
+  </Card>
+  <Card title="API reference" icon="book" href="/api/geocoder">
+    Explore the complete API documentation
+  </Card>
+</CardGroup>

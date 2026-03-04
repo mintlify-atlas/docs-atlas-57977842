@@ -1,0 +1,198 @@
+---
+title: Level queries
+description: Control the granularity of geocoding results using administrative levels
+---
+
+GeocoderID lets you query specific administrative levels, from broad (province) to precise (village). This is useful when you only need coarse-grained location data or want to optimize performance.
+
+## Complete example
+
+```go
+package main
+
+import (
+	"fmt"
+	"log"
+
+	geocoder "github.com/zsbahtiar/geocoder-id"
+)
+
+func main() {
+	gc, err := geocoder.NewDefault()
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer gc.Close()
+
+	lat, lon := -6.2088, 106.8456
+
+	fmt.Println("=== Query at different levels ===")
+
+	levels := []geocoder.Level{
+		geocoder.LevelProvince,
+		geocoder.LevelRegency,
+		geocoder.LevelDistrict,
+		geocoder.LevelVillage,
+	}
+
+	for _, level := range levels {
+		result := gc.ReverseGeocodeLevel(lat, lon, level)
+		fmt.Printf("Level: %s\n", level)
+		if result.Province != nil {
+			fmt.Printf("  Result: %s", result.Province.Name)
+			if result.Regency != nil {
+				fmt.Printf(" > %s", result.Regency.Name)
+			}
+			if result.District != nil {
+				fmt.Printf(" > %s", result.District.Name)
+			}
+			if result.Village != nil {
+				fmt.Printf(" > %s", result.Village.Name)
+			}
+			fmt.Println()
+		} else {
+			fmt.Println("  Result: not found")
+		}
+		fmt.Println()
+	}
+}
+```
+
+## Understanding administrative levels
+
+Indonesia's administrative hierarchy has four levels:
+
+<Accordion title="LevelProvince (Level 1)">
+  The broadest level, representing one of Indonesia's 34 provinces.
+
+  ```go
+  result := gc.ReverseGeocodeLevel(lat, lon, geocoder.LevelProvince)
+  // Only result.Province will be populated
+  ```
+
+  **Use when:** You only need to know which province a coordinate is in.
+</Accordion>
+
+<Accordion title="LevelRegency (Level 2)">
+  Regencies (kabupaten) or cities (kota) within a province.
+
+  ```go
+  result := gc.ReverseGeocodeLevel(lat, lon, geocoder.LevelRegency)
+  // result.Province and result.Regency will be populated
+  ```
+
+  **Use when:** You need city-level precision but not neighborhood details.
+</Accordion>
+
+<Accordion title="LevelDistrict (Level 3)">
+  Districts (kecamatan) within a regency.
+
+  ```go
+  result := gc.ReverseGeocodeLevel(lat, lon, geocoder.LevelDistrict)
+  // result.Province, result.Regency, and result.District will be populated
+  ```
+
+  **Use when:** You need sub-city precision for urban areas.
+</Accordion>
+
+<Accordion title="LevelVillage (Level 4)">
+  The most precise level: villages (desa/kelurahan) within a district.
+
+  ```go
+  result := gc.ReverseGeocodeLevel(lat, lon, geocoder.LevelVillage)
+  // All four levels may be populated (same as ReverseGeocode)
+  ```
+
+  **Use when:** You need the most precise administrative boundary available.
+</Accordion>
+
+## Progressive output
+
+Running the example shows how results become more detailed at each level:
+
+```
+=== Query at different levels ===
+
+Level: province
+  Result: DKI JAKARTA
+
+Level: regency
+  Result: DKI JAKARTA > KOTA JAKARTA PUSAT
+
+Level: district
+  Result: DKI JAKARTA > KOTA JAKARTA PUSAT > MENTENG
+
+Level: village
+  Result: DKI JAKARTA > KOTA JAKARTA PUSAT > MENTENG > MENTENG
+```
+
+<Info>
+  Notice how each level includes all parent levels. Querying at `LevelRegency` gives you both province and regency data.
+</Info>
+
+## When to use each level
+
+<Tabs>
+  <Tab title="Province level">
+    **Best for:**
+    - Regional analytics and reporting
+    - Broad geographic categorization
+    - Maximum performance (fewest boundaries to check)
+
+    **Example use cases:**
+    - "Which provinces do our customers come from?"
+    - Routing queries to region-specific services
+    - High-level geographic dashboards
+  </Tab>
+
+  <Tab title="Regency level">
+    **Best for:**
+    - City-level analysis
+    - Service area determination
+    - Balancing detail and performance
+
+    **Example use cases:**
+    - Delivery zone assignment
+    - City-based pricing tiers
+    - Municipal service mapping
+  </Tab>
+
+  <Tab title="District level">
+    **Best for:**
+    - Neighborhood-level detail
+    - Urban planning applications
+    - More precise location without full granularity
+
+    **Example use cases:**
+    - Local marketing campaigns
+    - School district assignment
+    - Emergency service dispatch
+  </Tab>
+
+  <Tab title="Village level">
+    **Best for:**
+    - Maximum precision
+    - Official address verification
+    - Detailed demographic analysis
+
+    **Example use cases:**
+    - Government data collection
+    - Census applications
+    - Precise address validation
+  </Tab>
+</Tabs>
+
+<Note>
+  `ReverseGeocode()` is equivalent to `ReverseGeocodeLevel()` with `LevelVillage`. Use the level-specific method when you want to optimize performance or don't need full detail.
+</Note>
+
+## Performance considerations
+
+Querying at lower levels is faster because fewer boundaries need to be checked:
+
+- **LevelProvince**: Fastest (only 34 boundaries)
+- **LevelRegency**: Fast (hundreds of boundaries)
+- **LevelDistrict**: Moderate (thousands of boundaries)
+- **LevelVillage**: Most thorough (tens of thousands of boundaries)
+
+For batch processing where you only need province or city data, using the appropriate level can significantly improve throughput.

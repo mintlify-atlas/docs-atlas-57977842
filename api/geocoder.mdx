@@ -1,0 +1,340 @@
+---
+title: Geocoder
+description: Main geocoder type and methods for reverse geocoding
+---
+
+## Geocoder type
+
+The `Geocoder` struct is the main interface for performing reverse geocoding operations.
+
+```go
+type Geocoder struct {
+    db *sql.DB
+}
+```
+
+## New
+
+Create a new geocoder instance with a custom database path.
+
+```go
+func New(dbPath string) (*Geocoder, error)
+```
+
+<ParamField path="dbPath" type="string" required>
+  Path to the DuckDB database file containing geocoding data
+</ParamField>
+
+**Returns:** A pointer to a `Geocoder` instance and an error if the database cannot be opened or the spatial extension cannot be loaded.
+
+<CodeGroup>
+```go Basic usage
+package main
+
+import (
+    "log"
+    geocoder "github.com/zsbahtiar/geocoder-id"
+)
+
+func main() {
+    gc, err := geocoder.New("/path/to/geocoder.duckdb")
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer gc.Close()
+    
+    // Use geocoder...
+}
+```
+
+```go With error handling
+package main
+
+import (
+    "fmt"
+    "log"
+    geocoder "github.com/zsbahtiar/geocoder-id"
+)
+
+func main() {
+    gc, err := geocoder.New("./data/geocoder.duckdb")
+    if err != nil {
+        log.Fatalf("Failed to initialize geocoder: %v", err)
+    }
+    defer gc.Close()
+    
+    fmt.Println("Geocoder initialized successfully")
+}
+```
+</CodeGroup>
+
+## NewDefault
+
+Create a new geocoder instance using automatic database discovery. This function searches for the database in multiple locations and automatically downloads it if not found.
+
+```go
+func NewDefault() (*Geocoder, error)
+```
+
+**Returns:** A pointer to a `Geocoder` instance and an error if the database cannot be found or downloaded.
+
+<Note>
+The database is searched in the following order:
+1. `GEOCODER_DB_PATH` environment variable
+2. `geocoder.duckdb` in current directory
+3. `data/geocoder.duckdb` relative to current directory
+4. `geocoder.duckdb` in executable directory
+5. `data/geocoder.duckdb` in executable directory
+6. `~/.geocoder-id/geocoder.duckdb` in user home directory
+
+If not found, the database is automatically downloaded to `~/.geocoder-id/geocoder.duckdb`.
+</Note>
+
+```go Example
+package main
+
+import (
+    "log"
+    geocoder "github.com/zsbahtiar/geocoder-id"
+)
+
+func main() {
+    gc, err := geocoder.NewDefault()
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer gc.Close()
+    
+    // Database is ready to use
+    result := gc.ReverseGeocode(-6.2088, 106.8456)
+}
+```
+
+## ReverseGeocode
+
+Perform reverse geocoding at the village level (most detailed) for a given coordinate.
+
+```go
+func (g *Geocoder) ReverseGeocode(lat, lon float64) Result
+```
+
+<ParamField path="lat" type="float64" required>
+  Latitude coordinate (decimal degrees)
+</ParamField>
+
+<ParamField path="lon" type="float64" required>
+  Longitude coordinate (decimal degrees)
+</ParamField>
+
+**Returns:** A `Result` struct containing location information at all administrative levels (province, regency, district, village).
+
+<CodeGroup>
+```go Basic example
+package main
+
+import (
+    "fmt"
+    "log"
+    geocoder "github.com/zsbahtiar/geocoder-id"
+)
+
+func main() {
+    gc, err := geocoder.NewDefault()
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer gc.Close()
+    
+    // Jakarta coordinates
+    result := gc.ReverseGeocode(-6.2088, 106.8456)
+    
+    if result.Province != nil {
+        fmt.Printf("Province: %s (%s)\n", result.Province.Name, result.Province.Code)
+    }
+    if result.Regency != nil {
+        fmt.Printf("Regency:  %s (%s)\n", result.Regency.Name, result.Regency.Code)
+    }
+    if result.District != nil {
+        fmt.Printf("District: %s (%s)\n", result.District.Name, result.District.Code)
+    }
+    if result.Village != nil {
+        fmt.Printf("Village:  %s (%s)\n", result.Village.Name, result.Village.Code)
+    }
+}
+```
+
+```go Multiple coordinates
+package main
+
+import (
+    "fmt"
+    geocoder "github.com/zsbahtiar/geocoder-id"
+)
+
+func main() {
+    gc, _ := geocoder.NewDefault()
+    defer gc.Close()
+    
+    coordinates := []struct{
+        Lat, Lon float64
+        Name string
+    }{
+        {-6.2088, 106.8456, "Jakarta"},
+        {-6.9175, 107.6191, "Bandung"},
+        {-7.2575, 112.7521, "Surabaya"},
+    }
+    
+    for _, coord := range coordinates {
+        result := gc.ReverseGeocode(coord.Lat, coord.Lon)
+        fmt.Printf("%s: %s\n", coord.Name, result.Province.Name)
+    }
+}
+```
+</CodeGroup>
+
+## ReverseGeocodeLevel
+
+Perform reverse geocoding at a specific administrative level.
+
+```go
+func (g *Geocoder) ReverseGeocodeLevel(lat, lon float64, level Level) Result
+```
+
+<ParamField path="lat" type="float64" required>
+  Latitude coordinate (decimal degrees)
+</ParamField>
+
+<ParamField path="lon" type="float64" required>
+  Longitude coordinate (decimal degrees)
+</ParamField>
+
+<ParamField path="level" type="Level" required>
+  Administrative level to query. Use `LevelProvince`, `LevelRegency`, `LevelDistrict`, or `LevelVillage`.
+</ParamField>
+
+**Returns:** A `Result` struct containing location information up to the specified administrative level.
+
+<Note>
+Querying at a higher level (e.g., province) is faster than querying at a lower level (e.g., village) as it needs to check fewer polygons.
+</Note>
+
+```go Example
+package main
+
+import (
+    "fmt"
+    geocoder "github.com/zsbahtiar/geocoder-id"
+)
+
+func main() {
+    gc, _ := geocoder.NewDefault()
+    defer gc.Close()
+    
+    lat, lon := -6.2088, 106.8456
+    
+    // Get province only
+    provinceResult := gc.ReverseGeocodeLevel(lat, lon, geocoder.LevelProvince)
+    fmt.Println("Province:", provinceResult.Province.Name)
+    
+    // Get up to regency level
+    regencyResult := gc.ReverseGeocodeLevel(lat, lon, geocoder.LevelRegency)
+    fmt.Println("Regency:", regencyResult.Regency.Name)
+    
+    // Get full detail (village level)
+    villageResult := gc.ReverseGeocodeLevel(lat, lon, geocoder.LevelVillage)
+    if villageResult.Village != nil {
+        fmt.Println("Village:", villageResult.Village.Name)
+    }
+}
+```
+
+## Close
+
+Close the database connection and release resources.
+
+```go
+func (g *Geocoder) Close() error
+```
+
+**Returns:** An error if the database connection cannot be closed.
+
+<Note>
+Always call `Close()` when you're done using the geocoder to prevent resource leaks. Use `defer` to ensure it's called even if errors occur.
+</Note>
+
+```go Example
+package main
+
+import (
+    geocoder "github.com/zsbahtiar/geocoder-id"
+)
+
+func main() {
+    gc, err := geocoder.NewDefault()
+    if err != nil {
+        panic(err)
+    }
+    defer gc.Close() // Ensures Close is called when main() exits
+    
+    // Use geocoder...
+}
+```
+
+## ParseCoords
+
+Parse a string containing multiple coordinates into a slice of `Coord` structs.
+
+```go
+func ParseCoords(s string) []Coord
+```
+
+<ParamField path="s" type="string" required>
+  String containing coordinates in the format "lat1 lon1; lat2 lon2; ...". Coordinates are separated by semicolons, and latitude/longitude values are separated by whitespace.
+</ParamField>
+
+**Returns:** A slice of `Coord` structs. Invalid coordinate pairs are silently skipped.
+
+<CodeGroup>
+```go Basic usage
+package main
+
+import (
+    "fmt"
+    geocoder "github.com/zsbahtiar/geocoder-id"
+)
+
+func main() {
+    coordStr := "-6.2088 106.8456; -6.9175 107.6191; -7.2575 112.7521"
+    coords := geocoder.ParseCoords(coordStr)
+    
+    fmt.Printf("Parsed %d coordinates\n", len(coords))
+    for i, coord := range coords {
+        fmt.Printf("%d: %.4f, %.4f\n", i+1, coord.Lat, coord.Lon)
+    }
+}
+```
+
+```go Batch processing
+package main
+
+import (
+    "fmt"
+    geocoder "github.com/zsbahtiar/geocoder-id"
+)
+
+func main() {
+    gc, _ := geocoder.NewDefault()
+    defer gc.Close()
+    
+    coordStr := "-6.2088 106.8456; -6.9175 107.6191"
+    coords := geocoder.ParseCoords(coordStr)
+    
+    for _, coord := range coords {
+        result := gc.ReverseGeocode(coord.Lat, coord.Lon)
+        if result.Province != nil {
+            fmt.Println(result.Province.Name)
+        }
+    }
+}
+```
+</CodeGroup>

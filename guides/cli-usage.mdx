@@ -1,0 +1,307 @@
+---
+title: CLI usage
+description: Use the Geocoder ID command-line interface for quick reverse geocoding tasks
+---
+
+The Geocoder ID CLI provides a convenient way to perform reverse geocoding from the command line. Use it for quick queries, batch processing, or integrating with shell scripts.
+
+## Installation
+
+Install the CLI tool using Go:
+
+```bash
+go install github.com/zsbahtiar/geocoder-id/cmd/geocoder@latest
+```
+
+Verify the installation:
+
+```bash
+geocoder --version
+```
+
+## Basic usage
+
+Use the `geocode` command to reverse geocode coordinates:
+
+```bash
+geocoder geocode --coords="-6.2088 106.8456"
+```
+
+<Info>
+Coordinates must be in the format `"lat lon"` (latitude first, then longitude) separated by a space.
+</Info>
+
+## Command-line flags
+
+The `geocode` command supports the following flags:
+
+<ParamField path="--coords" type="string" required>
+  Coordinates to geocode in the format `"lat lon"` or `"lat lon;lat lon;..."` for multiple coordinates.
+  
+  **Examples:**
+  - Single: `--coords="-6.2088 106.8456"`
+  - Multiple: `--coords="-6.2088 106.8456;-6.9175 107.6191"`
+</ParamField>
+
+<ParamField path="--db" type="string">
+  Custom database path. If not specified, the CLI will auto-detect the database location.
+  
+  **Default:** Auto-detect
+  
+  **Example:** `--db="/path/to/geocoder.duckdb"`
+</ParamField>
+
+<ParamField path="--output" type="string">
+  Output format: `table` or `json`.
+  
+  **Default:** `table`
+  
+  **Example:** `--output=json`
+</ParamField>
+
+<ParamField path="--level" type="string">
+  Administrative level to query: `province`, `regency`, `district`, or `village`.
+  
+  **Default:** `village`
+  
+  **Example:** `--level=province`
+</ParamField>
+
+<ParamField path="--debug" type="boolean">
+  Enable debug logging to stderr. Useful for troubleshooting database issues or performance analysis.
+  
+  **Default:** `false`
+  
+  **Example:** `--debug`
+</ParamField>
+
+## Output formats
+
+The CLI supports two output formats: table (default) and JSON.
+
+<Tabs>
+  <Tab title="Table output">
+    The default table format displays results in a human-readable table:
+    
+    ```bash
+    geocoder geocode --coords="-6.2088 106.8456"
+    ```
+    
+    **Example output:**
+    ```
+    | province_code | province_name            | regency_code | regency_name                    | district_code | district_name | village_code | village_name |
+    |---------------|--------------------------|--------------|----------------------------------|---------------|---------------|--------------|---------------|
+    | 31            | DKI JAKARTA              | 31.71        | KOTA JAKARTA PUSAT              | 31.71.01      | MENTENG       | 31.71.01.1001 | MENTENG      |
+    ```
+  </Tab>
+  
+  <Tab title="JSON output">
+    Use the JSON format for programmatic parsing or integration with other tools:
+    
+    ```bash
+    geocoder geocode --coords="-6.2088 106.8456" --output=json
+    ```
+    
+    **Example output:**
+    ```json
+    [
+      {
+        "province": {
+          "code": "31",
+          "name": "DKI JAKARTA"
+        },
+        "regency": {
+          "code": "31.71",
+          "name": "KOTA JAKARTA PUSAT"
+        },
+        "district": {
+          "code": "31.71.01",
+          "name": "MENTENG"
+        },
+        "village": {
+          "code": "31.71.01.1001",
+          "name": "MENTENG"
+        }
+      }
+    ]
+    ```
+  </Tab>
+</Tabs>
+
+## Batch processing coordinates
+
+Process multiple coordinates by separating them with semicolons:
+
+```bash
+geocoder geocode --coords="-6.2088 106.8456;-6.9175 107.6191;-7.2575 112.7521"
+```
+
+<Tip>
+Batch processing reuses the same database connection for all coordinates, making it more efficient than running the command multiple times.
+</Tip>
+
+**Example output:**
+```
+| province_code | province_name            | regency_code | regency_name                    | district_code | district_name | village_code | village_name |
+|---------------|--------------------------|--------------|----------------------------------|---------------|---------------|--------------|---------------|
+| 31            | DKI JAKARTA              | 31.71        | KOTA JAKARTA PUSAT              | 31.71.01      | MENTENG       | 31.71.01.1001 | MENTENG      |
+| 32            | JAWA BARAT               | 32.73        | KOTA BANDUNG                    | 32.73.08      | CICENDO       | 32.73.08.1006 | PASIRKALIKI  |
+| 35            | JAWA TIMUR               | 35.78        | KOTA SURABAYA                   | 35.78.22      | TEGALSARI     | 35.78.22.1001 | TEGALSARI    |
+```
+
+## Querying specific levels
+
+Use the `--level` flag to query at specific administrative levels:
+
+<CodeGroup>
+
+```bash Province level
+geocoder geocode --coords="-6.2088 106.8456" --level=province
+```
+
+```bash Regency level
+geocoder geocode --coords="-6.2088 106.8456" --level=regency
+```
+
+```bash District level
+geocoder geocode --coords="-6.2088 106.8456" --level=district
+```
+
+```bash Village level (default)
+geocoder geocode --coords="-6.2088 106.8456" --level=village
+```
+
+</CodeGroup>
+
+<Info>
+Querying at higher levels (province, regency) returns results faster than querying at the village level. See the [administrative levels guide](/guides/administrative-levels) for details.
+</Info>
+
+## Custom database path
+
+Specify a custom database location with the `--db` flag:
+
+```bash
+geocoder geocode --coords="-6.2088 106.8456" --db="/custom/path/geocoder.duckdb"
+```
+
+This is useful when:
+- You have the database in a non-standard location
+- You're using a custom or updated database file
+- You want to avoid the auto-download behavior
+
+See the [database management guide](/guides/database-management) for more information about database paths.
+
+## Debug mode
+
+Enable debug logging to troubleshoot issues or monitor performance:
+
+```bash
+geocoder geocode --coords="-6.2088 106.8456" --debug
+```
+
+**Example debug output (written to stderr):**
+```
+2026-03-04 10:15:23.045 [DEBUG] Starting geocode process
+2026-03-04 10:15:23.046 [DEBUG] Database: 
+2026-03-04 10:15:23.046 [DEBUG] Level: village
+2026-03-04 10:15:23.046 [DEBUG] Output: table
+2026-03-04 10:15:23.046 [DEBUG] Parsing coordinates: -6.2088 106.8456
+2026-03-04 10:15:23.046 [DEBUG] Parsed 1 coordinate(s)
+2026-03-04 10:15:23.046 [DEBUG] Opening database...
+2026-03-04 10:15:23.234 [DEBUG] Database opened successfully
+2026-03-04 10:15:23.234 [DEBUG] Processing coordinate 1: lat=-6.208800, lon=106.845600
+2026-03-04 10:15:23.234 [DEBUG] Querying level: village
+2026-03-04 10:15:23.267 [DEBUG] Coordinate 1: found DKI JAKARTA
+2026-03-04 10:15:23.267 [DEBUG] Geocoding complete, 1 result(s) found out of 1 coordinate(s)
+2026-03-04 10:15:23.267 [DEBUG] Done
+```
+
+<Tip>
+Debug logs are written to stderr, so you can redirect stdout to a file while still seeing debug information in your terminal.
+</Tip>
+
+## Shell integration examples
+
+Integrate the CLI with shell scripts for automation:
+
+<CodeGroup>
+
+```bash Parse JSON with jq
+# Extract only province names
+geocoder geocode --coords="-6.2088 106.8456" --output=json | jq '.[].province.name'
+
+# Get regency codes
+geocoder geocode --coords="-6.2088 106.8456" --output=json | jq '.[].regency.code'
+```
+
+```bash Process from file
+# Read coordinates from a file (one per line)
+while IFS= read -r coords; do
+  geocoder geocode --coords="$coords" --output=json
+done < coordinates.txt
+```
+
+```bash Batch with semicolons
+# Build a semicolon-separated list from a file
+COORDS=$(cat coordinates.txt | tr '\n' ';' | sed 's/;$//')
+geocoder geocode --coords="$COORDS" --output=json
+```
+
+</CodeGroup>
+
+## Error handling
+
+<Steps>
+
+<Step title="Invalid coordinate format">
+  The CLI validates coordinate format and exits with an error if invalid:
+  
+  ```bash
+  geocoder geocode --coords="invalid"
+  ```
+  
+  **Output:**
+  ```
+  Invalid coords format. Use: "lat lon" or "lat lon;lat lon;..."
+  ```
+</Step>
+
+<Step title="Database not found">
+  If the database is not found and cannot be downloaded, the CLI exits with an error:
+  
+  ```
+  Error: database not found
+  ```
+  
+  Use the `--db` flag to specify a custom database path or check your internet connection for auto-download.
+</Step>
+
+<Step title="No results found">
+  When coordinates are outside Indonesia, the CLI returns an empty result set:
+  
+  ```bash
+  geocoder geocode --coords="51.5074 -0.1278"  # London, UK
+  ```
+  
+  No output is produced (empty table or empty JSON array).
+</Step>
+
+</Steps>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Go library usage" icon="code" href="/guides/go-library">
+    Use the Go library in your applications
+  </Card>
+  <Card title="Database management" icon="database" href="/guides/database-management">
+    Learn about database paths and auto-download
+  </Card>
+  <Card title="Administrative levels" icon="map" href="/guides/administrative-levels">
+    Understand Indonesia's administrative hierarchy
+  </Card>
+  <Card title="API reference" icon="book" href="/api/geocoder">
+    Explore the complete API documentation
+  </Card>
+</CardGroup>

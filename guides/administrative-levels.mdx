@@ -1,0 +1,409 @@
+---
+title: Administrative levels
+description: Understand Indonesia's 4-level administrative hierarchy and how it affects geocoding results
+---
+
+Indonesia's administrative divisions are organized into a 4-level hierarchy. Understanding these levels is essential for querying the right level of detail in your geocoding applications.
+
+## Indonesia's administrative hierarchy
+
+Indonesia uses a hierarchical administrative structure from national to local level:
+
+<Steps>
+
+<Step title="Province (Provinsi)">
+  The top-level administrative division. Indonesia has 38 provinces as of 2024.
+  
+  **Example:** DKI Jakarta, Jawa Barat, Bali
+  
+  **Code format:** 2 digits (e.g., `31` for DKI Jakarta)
+</Step>
+
+<Step title="Regency/City (Kabupaten/Kota)">
+  The second-level administrative division. Each province contains multiple regencies (kabupaten) or cities (kota).
+  
+  **Example:** Kota Jakarta Pusat, Kabupaten Bandung, Kota Surabaya
+  
+  **Code format:** Province code + 2 digits (e.g., `31.71` for Kota Jakarta Pusat)
+</Step>
+
+<Step title="District/Subdistrict (Kecamatan)">
+  The third-level administrative division. Each regency/city contains multiple districts.
+  
+  **Example:** Menteng, Cicendo, Tegalsari
+  
+  **Code format:** Regency code + 2 digits (e.g., `31.71.01` for Menteng)
+</Step>
+
+<Step title="Village/Kelurahan (Desa/Kelurahan)">
+  The fourth and lowest-level administrative division. Each district contains multiple villages.
+  
+  **Example:** Menteng, Pasirkaliki, Tegalsari
+  
+  **Code format:** District code + 4 digits (e.g., `31.71.01.1001` for Menteng village)
+</Step>
+
+</Steps>
+
+<Info>
+The terms "regency" and "city" are both used for the second level. Urban areas typically use "kota" (city), while rural areas use "kabupaten" (regency).
+</Info>
+
+## Level constants
+
+Geocoder ID provides constants for each administrative level:
+
+```go
+package geocoder
+
+type Level string
+
+const (
+    LevelProvince Level = "province"
+    LevelRegency  Level = "regency"
+    LevelDistrict Level = "district"
+    LevelVillage  Level = "village"
+)
+```
+
+Use these constants when calling `ReverseGeocodeLevel()`:
+
+```go
+result := gc.ReverseGeocodeLevel(lat, lon, geocoder.LevelProvince)
+```
+
+<Tip>
+The CLI accepts level names as strings: `--level=province`, `--level=regency`, `--level=district`, or `--level=village`.
+</Tip>
+
+## How levels affect results
+
+Querying at different levels returns different amounts of information in the result hierarchy.
+
+### Default behavior (village level)
+
+By default, `ReverseGeocode()` queries at the village level, returning the complete hierarchy:
+
+```go
+package main
+
+import (
+    "fmt"
+    "log"
+    geocoder "github.com/zsbahtiar/geocoder-id"
+)
+
+func main() {
+    gc, err := geocoder.NewDefault()
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer gc.Close()
+
+    result := gc.ReverseGeocode(-6.2088, 106.8456)
+
+    if result.Province != nil {
+        fmt.Printf("Province: %s (%s)\n", result.Province.Name, result.Province.Code)
+    }
+    if result.Regency != nil {
+        fmt.Printf("Regency:  %s (%s)\n", result.Regency.Name, result.Regency.Code)
+    }
+    if result.District != nil {
+        fmt.Printf("District: %s (%s)\n", result.District.Name, result.District.Code)
+    }
+    if result.Village != nil {
+        fmt.Printf("Village:  %s (%s)\n", result.Village.Name, result.Village.Code)
+    }
+}
+```
+
+**Example output:**
+```
+Province: DKI JAKARTA (31)
+Regency:  KOTA JAKARTA PUSAT (31.71)
+District: MENTENG (31.71.01)
+Village:  MENTENG (31.71.01.1001)
+```
+
+### Querying specific levels
+
+Use `ReverseGeocodeLevel()` to query at a specific level:
+
+<Tabs>
+  <Tab title="Province level">
+    Query at the province level returns only province information:
+    
+    ```go
+    result := gc.ReverseGeocodeLevel(lat, lon, geocoder.LevelProvince)
+    ```
+    
+    **Result structure:**
+    - `Province`: Populated
+    - `Regency`: `nil`
+    - `District`: `nil`
+    - `Village`: `nil`
+  </Tab>
+  
+  <Tab title="Regency level">
+    Query at the regency level returns province and regency information:
+    
+    ```go
+    result := gc.ReverseGeocodeLevel(lat, lon, geocoder.LevelRegency)
+    ```
+    
+    **Result structure:**
+    - `Province`: Populated
+    - `Regency`: Populated
+    - `District`: `nil`
+    - `Village`: `nil`
+  </Tab>
+  
+  <Tab title="District level">
+    Query at the district level returns province, regency, and district information:
+    
+    ```go
+    result := gc.ReverseGeocodeLevel(lat, lon, geocoder.LevelDistrict)
+    ```
+    
+    **Result structure:**
+    - `Province`: Populated
+    - `Regency`: Populated
+    - `District`: Populated
+    - `Village`: `nil`
+  </Tab>
+  
+  <Tab title="Village level">
+    Query at the village level returns the complete hierarchy:
+    
+    ```go
+    result := gc.ReverseGeocodeLevel(lat, lon, geocoder.LevelVillage)
+    ```
+    
+    **Result structure:**
+    - `Province`: Populated
+    - `Regency`: Populated
+    - `District`: Populated
+    - `Village`: Populated
+  </Tab>
+</Tabs>
+
+## Complete example: querying all levels
+
+This example demonstrates how results differ when querying the same coordinate at different levels:
+
+```go
+package main
+
+import (
+    "fmt"
+    "log"
+    geocoder "github.com/zsbahtiar/geocoder-id"
+)
+
+func main() {
+    gc, err := geocoder.NewDefault()
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer gc.Close()
+
+    lat, lon := -6.2088, 106.8456
+
+    fmt.Println("=== Query at different levels ===\n")
+
+    levels := []geocoder.Level{
+        geocoder.LevelProvince,
+        geocoder.LevelRegency,
+        geocoder.LevelDistrict,
+        geocoder.LevelVillage,
+    }
+
+    for _, level := range levels {
+        result := gc.ReverseGeocodeLevel(lat, lon, level)
+        fmt.Printf("Level: %s\n", level)
+        if result.Province != nil {
+            fmt.Printf("  Result: %s", result.Province.Name)
+            if result.Regency != nil {
+                fmt.Printf(" > %s", result.Regency.Name)
+            }
+            if result.District != nil {
+                fmt.Printf(" > %s", result.District.Name)
+            }
+            if result.Village != nil {
+                fmt.Printf(" > %s", result.Village.Name)
+            }
+            fmt.Println()
+        } else {
+            fmt.Println("  Result: not found")
+        }
+        fmt.Println()
+    }
+}
+```
+
+**Example output:**
+```
+=== Query at different levels ===
+
+Level: province
+  Result: DKI JAKARTA
+
+Level: regency
+  Result: DKI JAKARTA > KOTA JAKARTA PUSAT
+
+Level: district
+  Result: DKI JAKARTA > KOTA JAKARTA PUSAT > MENTENG
+
+Level: village
+  Result: DKI JAKARTA > KOTA JAKARTA PUSAT > MENTENG > MENTENG
+```
+
+<Note>
+The hierarchy is cumulative: querying at a lower level always includes information from higher levels.
+</Note>
+
+## Performance considerations
+
+Different levels have different performance characteristics:
+
+<CardGroup cols={2}>
+  <Card title="Province level" icon="gauge-high">
+    **Fastest queries**
+    
+    Uses the largest polygons, resulting in fewer geometry comparisons.
+    
+    **Use when:** You only need province-level granularity
+  </Card>
+  
+  <Card title="Regency level" icon="gauge-high">
+    **Fast queries**
+    
+    Moderate number of polygons to check.
+    
+    **Use when:** City/regency level is sufficient
+  </Card>
+  
+  <Card title="District level" icon="gauge">
+    **Moderate speed**
+    
+    More polygons than regency level.
+    
+    **Use when:** You need district-level precision
+  </Card>
+  
+  <Card title="Village level" icon="gauge-simple">
+    **Slower queries**
+    
+    Largest number of small polygons to check.
+    
+    **Use when:** You need the most detailed information
+  </Card>
+</CardGroup>
+
+<Tip>
+For applications where performance is critical and you don't need village-level detail, query at the regency or district level instead.
+</Tip>
+
+## CLI usage with levels
+
+Use the `--level` flag to specify the administrative level:
+
+<CodeGroup>
+
+```bash Province level
+geocoder geocode --coords="-6.2088 106.8456" --level=province
+```
+
+```bash Regency level
+geocoder geocode --coords="-6.2088 106.8456" --level=regency
+```
+
+```bash District level
+geocoder geocode --coords="-6.2088 106.8456" --level=district
+```
+
+```bash Village level (default)
+geocoder geocode --coords="-6.2088 106.8456" --level=village
+```
+
+</CodeGroup>
+
+## Use cases by level
+
+<Accordion title="Province level - Regional analytics">
+  **Use cases:**
+  - National-level statistics and reporting
+  - Regional market analysis
+  - Province-based filtering or grouping
+  - High-level geographic visualization
+  
+  **Example:** Grouping sales data by province
+</Accordion>
+
+<Accordion title="Regency level - City/district operations">
+  **Use cases:**
+  - City-level logistics and delivery
+  - Municipal service boundaries
+  - Urban planning and analysis
+  - Local government operations
+  
+  **Example:** Determining which city a delivery address belongs to
+</Accordion>
+
+<Accordion title="District level - Neighborhood services">
+  **Use cases:**
+  - Subdistrict-level service areas
+  - Community-based applications
+  - Local administrative tasks
+  - Fine-grained location grouping
+  
+  **Example:** Assigning field officers to specific districts
+</Accordion>
+
+<Accordion title="Village level - Precise location">
+  **Use cases:**
+  - Detailed address validation
+  - Hyperlocal services
+  - Census and demographic analysis
+  - Complete administrative hierarchy
+  
+  **Example:** Validating precise addresses for government services
+</Accordion>
+
+## Understanding administrative codes
+
+Each level uses a hierarchical coding system:
+
+```
+Province:  31
+Regency:   31.71          (province + 2 digits)
+District:  31.71.01       (regency + 2 digits)
+Village:   31.71.01.1001  (district + 4 digits)
+```
+
+<Info>
+The dots (`.`) in codes are for readability. The actual official codes may not include separators.
+</Info>
+
+**Code breakdown example:**
+- `31` = DKI Jakarta (province)
+- `31.71` = Kota Jakarta Pusat (regency in DKI Jakarta)
+- `31.71.01` = Menteng (district in Jakarta Pusat)
+- `31.71.01.1001` = Menteng (village in Menteng district)
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Go library usage" icon="code" href="/guides/go-library">
+    Learn how to use ReverseGeocodeLevel() in Go
+  </Card>
+  <Card title="CLI usage" icon="terminal" href="/guides/cli-usage">
+    Use the --level flag in the CLI
+  </Card>
+  <Card title="Database management" icon="database" href="/guides/database-management">
+    Understand how the database stores level information
+  </Card>
+  <Card title="API reference" icon="book" href="/api/geocoder">
+    Explore the complete API documentation
+  </Card>
+</CardGroup>

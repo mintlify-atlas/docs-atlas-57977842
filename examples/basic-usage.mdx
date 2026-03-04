@@ -1,0 +1,116 @@
+---
+title: Basic usage
+description: Learn the fundamentals of reverse geocoding with Geocoder ID
+---
+
+This guide walks through a complete basic example of using Geocoder ID to perform reverse geocoding on Indonesian coordinates.
+
+## Complete example
+
+Here's a simple program that geocodes Jakarta's coordinates:
+
+```go
+package main
+
+import (
+	"fmt"
+	"log"
+
+	geocoder "github.com/zsbahtiar/geocoder-id"
+)
+
+func main() {
+	gc, err := geocoder.NewDefault()
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer gc.Close()
+
+	result := gc.ReverseGeocode(-6.2088, 106.8456)
+
+	if result.Province != nil {
+		fmt.Printf("Province: %s (%s)\n", result.Province.Name, result.Province.Code)
+	}
+	if result.Regency != nil {
+		fmt.Printf("Regency:  %s (%s)\n", result.Regency.Name, result.Regency.Code)
+	}
+	if result.District != nil {
+		fmt.Printf("District: %s (%s)\n", result.District.Name, result.District.Code)
+	}
+	if result.Village != nil {
+		fmt.Printf("Village:  %s (%s)\n", result.Village.Name, result.Village.Code)
+	}
+}
+```
+
+## Step-by-step breakdown
+
+<Accordion title="1. Create the geocoder instance">
+  ```go
+  gc, err := geocoder.NewDefault()
+  if err != nil {
+      log.Fatal(err)
+  }
+  defer gc.Close()
+  ```
+
+  The `NewDefault()` function creates a geocoder with the embedded boundary dataset. Always check for errors during initialization and remember to close the geocoder when done.
+</Accordion>
+
+<Accordion title="2. Perform the reverse geocode query">
+  ```go
+  result := gc.ReverseGeocode(-6.2088, 106.8456)
+  ```
+
+  Pass latitude and longitude as separate parameters. This example uses coordinates in Jakarta, Indonesia.
+</Accordion>
+
+<Accordion title="3. Handle the result">
+  ```go
+  if result.Province != nil {
+      fmt.Printf("Province: %s (%s)\n", result.Province.Name, result.Province.Code)
+  }
+  if result.Regency != nil {
+      fmt.Printf("Regency:  %s (%s)\n", result.Regency.Name, result.Regency.Code)
+  }
+  // ... check District and Village similarly
+  ```
+
+  Each administrative level (Province, Regency, District, Village) may be `nil` if not found. Always check before accessing.
+</Accordion>
+
+<Accordion title="4. Clean up resources">
+  ```go
+  defer gc.Close()
+  ```
+
+  The `Close()` method releases the geocoder's resources. Using `defer` ensures it's called even if errors occur.
+</Accordion>
+
+## Expected output
+
+Running this program produces:
+
+```
+Province: DKI JAKARTA (31)
+Regency:  KOTA JAKARTA PUSAT (3171)
+District: MENTENG (317104)
+Village:  MENTENG (3171041006)
+```
+
+<Note>
+  Each administrative unit includes both its name and official BPS code. The codes follow Indonesia's hierarchical administrative coding system.
+</Note>
+
+## Error handling
+
+The geocoder can fail during initialization if:
+- The embedded data cannot be loaded
+- System resources are unavailable
+- The data format is corrupted
+
+Always check the error return value from `NewDefault()` before using the geocoder.
+
+<Info>
+  If coordinates fall outside Indonesian territory or in areas without boundary data, the result fields will be `nil`. This is not an error condition.
+</Info>

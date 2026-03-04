@@ -1,0 +1,259 @@
+---
+title: Types
+description: Core data types for geocoding results and coordinates
+---
+
+## Result
+
+The `Result` struct contains the outcome of a reverse geocoding operation, with information about all administrative levels.
+
+```go
+type Result struct {
+    Province *Location `json:"province,omitempty"`
+    Regency  *Location `json:"regency,omitempty"`
+    District *Location `json:"district,omitempty"`
+    Village  *Location `json:"village,omitempty"`
+}
+```
+
+### Fields
+
+<ResponseField name="Province" type="*Location">
+  Province-level administrative information. Pointer will be `nil` if the coordinate is not found in any province.
+</ResponseField>
+
+<ResponseField name="Regency" type="*Location">
+  Regency/city-level administrative information (Kabupaten/Kota). Pointer will be `nil` if querying at province level or if not found.
+</ResponseField>
+
+<ResponseField name="District" type="*Location">
+  District-level administrative information (Kecamatan). Pointer will be `nil` if querying at province or regency level, or if not found.
+</ResponseField>
+
+<ResponseField name="Village" type="*Location">
+  Village-level administrative information (Desa/Kelurahan). Pointer will be `nil` if querying at higher levels or if not found.
+</ResponseField>
+
+### JSON representation
+
+<CodeGroup>
+```json Full result (village level)
+{
+  "province": {
+    "code": "31",
+    "name": "DKI Jakarta"
+  },
+  "regency": {
+    "code": "31.75",
+    "name": "Kota Jakarta Timur"
+  },
+  "district": {
+    "code": "31.75.06",
+    "name": "Kramat Jati"
+  },
+  "village": {
+    "code": "31.75.06.1006",
+    "name": "Cililitan"
+  }
+}
+```
+
+```json Province level only
+{
+  "province": {
+    "code": "31",
+    "name": "DKI Jakarta"
+  }
+}
+```
+
+```json Not found
+{
+  "province": null,
+  "regency": null,
+  "district": null,
+  "village": null
+}
+```
+</CodeGroup>
+
+### Usage example
+
+```go
+package main
+
+import (
+    "encoding/json"
+    "fmt"
+    geocoder "github.com/zsbahtiar/geocoder-id"
+)
+
+func main() {
+    gc, _ := geocoder.NewDefault()
+    defer gc.Close()
+    
+    result := gc.ReverseGeocode(-6.2088, 106.8456)
+    
+    // Check if location was found
+    if result.Province == nil {
+        fmt.Println("Location not found")
+        return
+    }
+    
+    // Marshal to JSON
+    jsonData, _ := json.MarshalIndent(result, "", "  ")
+    fmt.Println(string(jsonData))
+}
+```
+
+## Location
+
+The `Location` struct represents a single administrative unit with its code and name.
+
+```go
+type Location struct {
+    Code string `json:"code"`
+    Name string `json:"name"`
+}
+```
+
+### Fields
+
+<ResponseField name="Code" type="string" required>
+  Official administrative code assigned by the Indonesian government (Kemendagri). The code format varies by level:
+  - Province: 2 digits (e.g., "31")
+  - Regency: 2.2 digits (e.g., "31.75")
+  - District: 2.2.2 digits (e.g., "31.75.06")
+  - Village: 2.2.2.4 digits (e.g., "31.75.06.1006")
+</ResponseField>
+
+<ResponseField name="Name" type="string" required>
+  Official name of the administrative unit in Indonesian language.
+</ResponseField>
+
+### JSON representation
+
+```json
+{
+  "code": "31.75",
+  "name": "Kota Jakarta Timur"
+}
+```
+
+### Usage example
+
+```go
+package main
+
+import (
+    "fmt"
+    geocoder "github.com/zsbahtiar/geocoder-id"
+)
+
+func main() {
+    gc, _ := geocoder.NewDefault()
+    defer gc.Close()
+    
+    result := gc.ReverseGeocode(-6.2088, 106.8456)
+    
+    // Access location details
+    if result.Province != nil {
+        fmt.Printf("Code: %s\n", result.Province.Code)
+        fmt.Printf("Name: %s\n", result.Province.Name)
+    }
+    
+    // Build hierarchical path
+    if result.Village != nil {
+        path := result.Province.Name
+        if result.Regency != nil {
+            path += " > " + result.Regency.Name
+        }
+        if result.District != nil {
+            path += " > " + result.District.Name
+        }
+        path += " > " + result.Village.Name
+        fmt.Println("Full path:", path)
+    }
+}
+```
+
+## Coord
+
+The `Coord` struct represents a geographic coordinate with latitude and longitude.
+
+```go
+type Coord struct {
+    Lat float64
+    Lon float64
+}
+```
+
+### Fields
+
+<ResponseField name="Lat" type="float64" required>
+  Latitude in decimal degrees. Valid range: -90 to 90. For Indonesia, typically between -11 (southern) and 6 (northern).
+</ResponseField>
+
+<ResponseField name="Lon" type="float64" required>
+  Longitude in decimal degrees. Valid range: -180 to 180. For Indonesia, typically between 95 (western) and 141 (eastern).
+</ResponseField>
+
+<Note>
+Coordinates use the WGS84 datum (same as GPS). Positive latitude is north of the equator, negative is south. Positive longitude is east of the prime meridian, negative is west.
+</Note>
+
+### Usage example
+
+<CodeGroup>
+```go Manual creation
+package main
+
+import (
+    "fmt"
+    geocoder "github.com/zsbahtiar/geocoder-id"
+)
+
+func main() {
+    gc, _ := geocoder.NewDefault()
+    defer gc.Close()
+    
+    coords := []geocoder.Coord{
+        {Lat: -6.2088, Lon: 106.8456}, // Jakarta
+        {Lat: -6.9175, Lon: 107.6191}, // Bandung
+        {Lat: -7.2575, Lon: 112.7521}, // Surabaya
+    }
+    
+    for _, coord := range coords {
+        result := gc.ReverseGeocode(coord.Lat, coord.Lon)
+        fmt.Printf("%.4f, %.4f -> %s\n", 
+            coord.Lat, coord.Lon, result.Province.Name)
+    }
+}
+```
+
+```go With ParseCoords
+package main
+
+import (
+    "fmt"
+    geocoder "github.com/zsbahtiar/geocoder-id"
+)
+
+func main() {
+    gc, _ := geocoder.NewDefault()
+    defer gc.Close()
+    
+    // Parse from string
+    input := "-6.2088 106.8456; -6.9175 107.6191; -7.2575 112.7521"
+    coords := geocoder.ParseCoords(input)
+    
+    fmt.Printf("Processing %d coordinates:\n", len(coords))
+    for i, coord := range coords {
+        result := gc.ReverseGeocode(coord.Lat, coord.Lon)
+        if result.Province != nil {
+            fmt.Printf("%d. %s\n", i+1, result.Province.Name)
+        }
+    }
+}
+```
+</CodeGroup>

@@ -338,3 +338,28 @@ func main() {
 }
 ```
 </CodeGroup>
+
+## Version
+
+Package version string used for database downloads and version information.
+
+```go
+var Version = "dev"
+```
+
+This variable is set at build time using linker flags. When building with `make`, the version is extracted from git tags.
+
+```bash Build with version
+make build
+# Sets Version using: -ldflags "-X github.com/zsbahtiar/geocoder-id.Version=$(VERSION)"
+```
+
+The version is also accessible via the CLI:
+
+```bash Check version
+geocoder --version
+```
+
+<Info>
+The Version variable determines which database version to download when auto-downloading. In development builds (Version = "dev"), it defaults to the latest stable version.
+</Info>

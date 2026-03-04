@@ -1,0 +1,62 @@
+{
+  "projectType": "sdk-library",
+  "projectName": "Geocoder ID",
+  "projectDescription": "Offline reverse geocoding library for Indonesia with CLI support, converting coordinates to administrative addresses down to village level.",
+  "theme": "palm",
+  "primaryColor": "#2E7D32",
+  "lightColor": "#66BB6A",
+  "darkColor": "#1B5E20",
+  "navigation": {
+    "groups": [
+      {
+        "group": "Get Started",
+        "pages": [
+          "introduction",
+          "installation",
+          "quickstart"
+        ]
+      },
+      {
+        "group": "Guides",
+        "pages": [
+          "guides/go-library",
+          "guides/cli-usage",
+          "guides/database-management",
+          "guides/administrative-levels"
+        ]
+      },
+      {
+        "group": "API Reference",
+        "pages": [
+          "api/geocoder",
+          "api/types",
+          "api/levels"
+        ]
+      },
+      {
+        "group": "Examples",
+        "pages": [
+          "examples/basic-usage",
+          "examples/batch-processing",
+          "examples/level-queries"
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Offline reverse geocoding with no internet required",
+    "Fast spatial indexing for O(log n) queries",
+    "Auto-download database on first use",
+    "Works as both CLI tool and Go library",
+    "Support for province, regency, district, and village levels"
+  ],
+  "publicApiSurface": [
+    "New(dbPath string) (*Geocoder, error)",
+    "NewDefault() (*Geocoder, error)",
+    "(*Geocoder).ReverseGeocode(lat, lon float64) Result",
+    "(*Geocoder).ReverseGeocodeLevel(lat, lon float64, level Level) Result",
+    "(*Geocoder).Close() error",
+    "ParseCoords(s string) []Coord",
+    "LevelProvince, LevelRegency, LevelDistrict, LevelVillage"
+  ]
+}
